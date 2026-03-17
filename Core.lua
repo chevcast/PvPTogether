@@ -34,9 +34,6 @@ PvPTogether.nameplateStyleLabels = {
 
 PvPTogether.DEFAULTS = {
 	enabled = true,
-	partyMemberStyle = STYLE_MODERN,
-	friendlyPlayerStyle = STYLE_MODERN,
-	enemyPlayerStyle = STYLE_MODERN,
 	partyMemberBorderEnabled = false,
 	partyMemberBorderColor = {
 		r = 0.0,
@@ -309,25 +306,39 @@ function PvPTogether:InitializeDatabase()
 
 	if self.db.styleSeeded ~= true then
 		local globalStyle = self:GetCurrentGlobalNameplateStyle()
-		self.db.partyMemberStyle = globalStyle
-		self.db.friendlyPlayerStyle = globalStyle
-		self.db.enemyPlayerStyle = globalStyle
+		if self.db.partyMemberStyle == nil then
+			self.db.partyMemberStyle = globalStyle
+		end
+		if self.db.friendlyPlayerStyle == nil then
+			self.db.friendlyPlayerStyle = globalStyle
+		end
+		if self.db.enemyPlayerStyle == nil then
+			self.db.enemyPlayerStyle = globalStyle
+		end
 		self.db.styleSeeded = true
 	end
 
 	if self.db.partyMemberStyleSeeded ~= true then
-		local fallbackGroupStyle = self:NormalizeNameplateStyle(
-			self.db.friendlyPlayerStyle,
-			self:GetCurrentGlobalNameplateStyle()
-		)
-		self.db.partyMemberStyle = fallbackGroupStyle
+		if self.db.partyMemberStyle == nil and self:IsNameplateStyle(self.db.friendlyPlayerStyle) then
+			local fallbackGroupStyle = self:NormalizeNameplateStyle(
+				self.db.friendlyPlayerStyle,
+				self:GetCurrentGlobalNameplateStyle()
+			)
+			self.db.partyMemberStyle = fallbackGroupStyle
+		end
 		self.db.partyMemberStyleSeeded = true
 	end
 
 	local fallbackStyle = self:GetCurrentGlobalNameplateStyle()
-	self.db.partyMemberStyle = self:NormalizeNameplateStyle(self.db.partyMemberStyle, fallbackStyle)
-	self.db.friendlyPlayerStyle = self:NormalizeNameplateStyle(self.db.friendlyPlayerStyle, fallbackStyle)
-	self.db.enemyPlayerStyle = self:NormalizeNameplateStyle(self.db.enemyPlayerStyle, fallbackStyle)
+	if self.db.partyMemberStyle ~= nil then
+		self.db.partyMemberStyle = self:NormalizeNameplateStyle(self.db.partyMemberStyle, fallbackStyle)
+	end
+	if self.db.friendlyPlayerStyle ~= nil then
+		self.db.friendlyPlayerStyle = self:NormalizeNameplateStyle(self.db.friendlyPlayerStyle, fallbackStyle)
+	end
+	if self.db.enemyPlayerStyle ~= nil then
+		self.db.enemyPlayerStyle = self:NormalizeNameplateStyle(self.db.enemyPlayerStyle, fallbackStyle)
+	end
 	self.db.partyMemberBorderEnabled = self.db.partyMemberBorderEnabled == true
 	self.db.friendlyPlayerBorderEnabled = self.db.friendlyPlayerBorderEnabled == true
 	self.db.enemyPlayerBorderEnabled = self.db.enemyPlayerBorderEnabled == true
