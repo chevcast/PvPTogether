@@ -30,7 +30,9 @@ local FALLBACK_NAME_PLATE_SCALES = {
 	[SIZE_HUGE] = { horizontal = 1.6, vertical = 1.6, classification = 1.6, aura = 1.6 },
 }
 local BORDER_TINT_TEXTURE_ATLAS = "UI-HUD-Nameplates-Selected"
-local BORDER_TINT_TEXTURE_ALPHA = 0.75
+local BORDER_TINT_TEXTURE_ALPHA = 0.92
+local BORDER_GLOW_TEXTURE_ALPHA = 0.35
+local BORDER_GLOW_OUTSET = 4
 
 local function IsFrameForbidden(frame)
 	if not frame or not frame.IsForbidden then
@@ -354,7 +356,7 @@ local function GetBorderTintHealthBar(unitFrame)
 	return healthBar
 end
 
-local function AnchorBorderTintTexture(healthBar, texture)
+local function AnchorBorderTintTexture(healthBar, texture, extraOutset)
 	if not CanMutateFrame(healthBar) or not CanMutateFrame(texture) then
 		return
 	end
@@ -364,9 +366,92 @@ local function AnchorBorderTintTexture(healthBar, texture)
 		anchorTarget = healthBar
 	end
 
+	local outset = PvPTogether:SafeToNumber(extraOutset) or 0
+	if outset < 0 then
+		outset = 0
+	end
+
 	texture:ClearAllPoints()
-	SetPixelPoint(texture, "TOPLEFT", anchorTarget, "TOPLEFT", -1, 1)
-	SetPixelPoint(texture, "BOTTOMRIGHT", anchorTarget, "BOTTOMRIGHT", -3, 3)
+	SetPixelPoint(texture, "TOPLEFT", anchorTarget, "TOPLEFT", -1 - outset, 1 + outset)
+	SetPixelPoint(texture, "BOTTOMRIGHT", anchorTarget, "BOTTOMRIGHT", -3 + outset, 3 + outset)
+end
+
+local function AnchorBorderGlowTextures(healthBar, overlay)
+	if not CanMutateFrame(healthBar) or type(overlay) ~= "table" then
+		return
+	end
+
+	local glowTop = overlay.GlowTop
+	local glowBottom = overlay.GlowBottom
+	local glowLeft = overlay.GlowLeft
+	local glowRight = overlay.GlowRight
+	if
+		not CanMutateFrame(glowTop)
+		or not CanMutateFrame(glowBottom)
+		or not CanMutateFrame(glowLeft)
+		or not CanMutateFrame(glowRight)
+	then
+		return
+	end
+
+	local anchorTarget = healthBar.bgTexture
+	if not CanMutateFrame(anchorTarget) then
+		anchorTarget = healthBar
+	end
+
+	local outset = PvPTogether:SafeToNumber(BORDER_GLOW_OUTSET) or 0
+	if outset < 0 then
+		outset = 0
+	end
+
+	-- Top glow: strongest at border edge, fades outward/up.
+	glowTop:ClearAllPoints()
+	SetPixelPoint(glowTop, "TOPLEFT", anchorTarget, "TOPLEFT", -1, 1 + outset)
+	SetPixelPoint(glowTop, "BOTTOMRIGHT", anchorTarget, "TOPRIGHT", -3, 1)
+
+	-- Bottom glow: strongest at border edge, fades outward/down.
+	glowBottom:ClearAllPoints()
+	SetPixelPoint(glowBottom, "TOPLEFT", anchorTarget, "BOTTOMLEFT", -1, 3)
+	SetPixelPoint(glowBottom, "BOTTOMRIGHT", anchorTarget, "BOTTOMRIGHT", -3, 3 - outset)
+
+	-- Left glow: strongest at border edge, fades outward/left.
+	glowLeft:ClearAllPoints()
+	SetPixelPoint(glowLeft, "TOPLEFT", anchorTarget, "TOPLEFT", -1 - outset, 1)
+	SetPixelPoint(glowLeft, "BOTTOMRIGHT", anchorTarget, "BOTTOMLEFT", -1, 3)
+
+	-- Right glow: strongest at border edge, fades outward/right.
+	glowRight:ClearAllPoints()
+	SetPixelPoint(glowRight, "TOPLEFT", anchorTarget, "TOPRIGHT", -3, 1)
+	SetPixelPoint(glowRight, "BOTTOMRIGHT", anchorTarget, "BOTTOMRIGHT", -3 + outset, 3)
+end
+
+local function ApplyBorderGlowGradient(texture, orientation, red, green, blue, alpha, invert)
+	if not CanMutateFrame(texture) then
+		return
+	end
+
+	local colorAlpha = PvPTogether:SafeToNumber(alpha) or 0
+	if colorAlpha < 0 then
+		colorAlpha = 0
+	elseif colorAlpha > 1 then
+		colorAlpha = 1
+	end
+
+	local useGradient = texture.SetGradient and type(CreateColor) == "function"
+	if useGradient then
+		local strongColor = CreateColor(red, green, blue, colorAlpha)
+		local clearColor = CreateColor(red, green, blue, 0)
+		if invert then
+			texture:SetGradient(orientation, clearColor, strongColor)
+		else
+			texture:SetGradient(orientation, strongColor, clearColor)
+		end
+		return
+	end
+
+	if texture.SetColorTexture then
+		texture:SetColorTexture(red, green, blue, colorAlpha)
+	end
 end
 
 local function EnsureBorderTintTexture(unitFrame)
@@ -382,17 +467,47 @@ local function EnsureBorderTintTexture(unitFrame)
 	end
 
 	local texture = healthBar:CreateTexture(nil, "OVERLAY", nil, 2)
-	if not CanMutateFrame(texture) then
+	local glowTop = healthBar:CreateTexture(nil, "OVERLAY", nil, 1)
+	local glowBottom = healthBar:CreateTexture(nil, "OVERLAY", nil, 1)
+	local glowLeft = healthBar:CreateTexture(nil, "OVERLAY", nil, 1)
+	local glowRight = healthBar:CreateTexture(nil, "OVERLAY", nil, 1)
+	if
+		not CanMutateFrame(texture)
+		or not CanMutateFrame(glowTop)
+		or not CanMutateFrame(glowBottom)
+		or not CanMutateFrame(glowLeft)
+		or not CanMutateFrame(glowRight)
+	then
 		return nil
 	end
 
 	if texture.SetAtlas then
 		texture:SetAtlas(BORDER_TINT_TEXTURE_ATLAS, true)
 	end
+	if glowTop.SetBlendMode then
+		glowTop:SetBlendMode("ADD")
+	end
+	if glowBottom.SetBlendMode then
+		glowBottom:SetBlendMode("ADD")
+	end
+	if glowLeft.SetBlendMode then
+		glowLeft:SetBlendMode("ADD")
+	end
+	if glowRight.SetBlendMode then
+		glowRight:SetBlendMode("ADD")
+	end
 	texture:Hide()
+	glowTop:Hide()
+	glowBottom:Hide()
+	glowLeft:Hide()
+	glowRight:Hide()
 
 	local overlay = {
 		Texture = texture,
+		GlowTop = glowTop,
+		GlowBottom = glowBottom,
+		GlowLeft = glowLeft,
+		GlowRight = glowRight,
 		HealthBar = healthBar,
 	}
 	PvPTogether.nameplateBorderTintByUnitFrame[unitFrame] = overlay
@@ -411,6 +526,18 @@ function PvPTogether:HideBorderTintForUnitFrame(unitFrame)
 
 	if overlay.Texture and overlay.Texture.Hide and not IsFrameForbidden(overlay.Texture) then
 		overlay.Texture:Hide()
+	end
+	if overlay.GlowTop and overlay.GlowTop.Hide and not IsFrameForbidden(overlay.GlowTop) then
+		overlay.GlowTop:Hide()
+	end
+	if overlay.GlowBottom and overlay.GlowBottom.Hide and not IsFrameForbidden(overlay.GlowBottom) then
+		overlay.GlowBottom:Hide()
+	end
+	if overlay.GlowLeft and overlay.GlowLeft.Hide and not IsFrameForbidden(overlay.GlowLeft) then
+		overlay.GlowLeft:Hide()
+	end
+	if overlay.GlowRight and overlay.GlowRight.Hide and not IsFrameForbidden(overlay.GlowRight) then
+		overlay.GlowRight:Hide()
 	end
 end
 
@@ -441,10 +568,12 @@ function PvPTogether:ApplyBorderTintForUnitFrame(unitFrame, unitKind)
 		return
 	end
 
-	AnchorBorderTintTexture(healthBar, overlay.Texture)
+	AnchorBorderTintTexture(healthBar, overlay.Texture, 0)
+	AnchorBorderGlowTextures(healthBar, overlay)
 
 	local color = self:GetConfiguredBorderColorForUnitKind(unitKind)
-	local alpha = BORDER_TINT_TEXTURE_ALPHA
+	local tintAlpha = BORDER_TINT_TEXTURE_ALPHA
+	local glowAlpha = BORDER_GLOW_TEXTURE_ALPHA
 	if healthBar.GetAlpha then
 		local healthBarAlpha = healthBar:GetAlpha()
 		if type(healthBarAlpha) == "number" then
@@ -453,17 +582,29 @@ function PvPTogether:ApplyBorderTintForUnitFrame(unitFrame, unitKind)
 			elseif healthBarAlpha > 1 then
 				healthBarAlpha = 1
 			end
-			alpha = healthBarAlpha * BORDER_TINT_TEXTURE_ALPHA
+			tintAlpha = healthBarAlpha * BORDER_TINT_TEXTURE_ALPHA
+			glowAlpha = healthBarAlpha * BORDER_GLOW_TEXTURE_ALPHA
 		end
 	end
 
 	if overlay.Texture.SetVertexColor then
-		overlay.Texture:SetVertexColor(color.r, color.g, color.b, alpha)
+		overlay.Texture:SetVertexColor(color.r, color.g, color.b, tintAlpha)
 	elseif overlay.Texture.SetColorTexture then
-		overlay.Texture:SetColorTexture(color.r, color.g, color.b, alpha)
+		overlay.Texture:SetColorTexture(color.r, color.g, color.b, tintAlpha)
 	end
 
 	overlay.Texture:Show()
+	if overlay.GlowTop and overlay.GlowBottom and overlay.GlowLeft and overlay.GlowRight then
+		ApplyBorderGlowGradient(overlay.GlowTop, "VERTICAL", color.r, color.g, color.b, glowAlpha, true)
+		ApplyBorderGlowGradient(overlay.GlowBottom, "VERTICAL", color.r, color.g, color.b, glowAlpha, false)
+		ApplyBorderGlowGradient(overlay.GlowLeft, "HORIZONTAL", color.r, color.g, color.b, glowAlpha, true)
+		ApplyBorderGlowGradient(overlay.GlowRight, "HORIZONTAL", color.r, color.g, color.b, glowAlpha, false)
+
+		overlay.GlowTop:Show()
+		overlay.GlowBottom:Show()
+		overlay.GlowLeft:Show()
+		overlay.GlowRight:Show()
+	end
 end
 
 function PvPTogether:HideAllBorderTintOverrides()

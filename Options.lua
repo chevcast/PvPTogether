@@ -102,6 +102,10 @@ local function ClampColorComponent(value, fallback)
 	return numericValue
 end
 
+local function ColorsNearlyEqual(left, right)
+	return math.abs((left or 0) - (right or 0)) < 0.001
+end
+
 local function GetColorOption(optionKey, fallbackColor)
 	local configuredColor = PvPTogether:GetOption(optionKey)
 	if type(configuredColor) ~= "table" then
@@ -117,6 +121,13 @@ local function GetColorOption(optionKey, fallbackColor)
 		g = ClampColorComponent(configuredColor.g, fallbackColor.g),
 		b = ClampColorComponent(configuredColor.b, fallbackColor.b),
 	}
+end
+
+local function IsColorOptionAtDefault(optionKey, fallbackColor)
+	local current = GetColorOption(optionKey, fallbackColor)
+	return ColorsNearlyEqual(current.r, fallbackColor.r)
+		and ColorsNearlyEqual(current.g, fallbackColor.g)
+		and ColorsNearlyEqual(current.b, fallbackColor.b)
 end
 
 local function CreateColorSwatch(parent, optionKey, labelText, tooltipText, fallbackColor, x, y)
@@ -302,6 +313,28 @@ function PvPTogether:RefreshOptionsWindow()
 		self.DEFAULTS.enemyPlayerBorderColor
 	)
 
+	if controls.resetPartyMemberBorderColor then
+		if IsColorOptionAtDefault("partyMemberBorderColor", self.DEFAULTS.partyMemberBorderColor) then
+			controls.resetPartyMemberBorderColor:Hide()
+		else
+			controls.resetPartyMemberBorderColor:Show()
+		end
+	end
+	if controls.resetFriendlyPlayerBorderColor then
+		if IsColorOptionAtDefault("friendlyPlayerBorderColor", self.DEFAULTS.friendlyPlayerBorderColor) then
+			controls.resetFriendlyPlayerBorderColor:Hide()
+		else
+			controls.resetFriendlyPlayerBorderColor:Show()
+		end
+	end
+	if controls.resetEnemyPlayerBorderColor then
+		if IsColorOptionAtDefault("enemyPlayerBorderColor", self.DEFAULTS.enemyPlayerBorderColor) then
+			controls.resetEnemyPlayerBorderColor:Hide()
+		else
+			controls.resetEnemyPlayerBorderColor:Show()
+		end
+	end
+
 	SetColorSwatchEnabled(controls.partyMemberBorderColor, enabled and partyBorderEnabled)
 	SetColorSwatchEnabled(controls.friendlyPlayerBorderColor, enabled and friendlyBorderEnabled)
 	SetColorSwatchEnabled(controls.enemyPlayerBorderColor, enabled and enemyBorderEnabled)
@@ -373,6 +406,21 @@ function PvPTogether:InitializeOptionsWindow()
 		320,
 		-188
 	)
+	partyMemberBorderColor:ClearAllPoints()
+	partyMemberBorderColor:SetPoint("LEFT", partyMemberBorderEnabled.Label, "RIGHT", 24, 0)
+	local resetPartyMemberBorderColor = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	resetPartyMemberBorderColor:SetSize(70, 20)
+	resetPartyMemberBorderColor:SetPoint("LEFT", partyMemberBorderColor, "RIGHT", 56, 0)
+	resetPartyMemberBorderColor:SetText("Reset")
+	resetPartyMemberBorderColor:SetScript("OnClick", function()
+		local defaults = PvPTogether.DEFAULTS.partyMemberBorderColor
+		PvPTogether:SetOption("partyMemberBorderColor", {
+			r = defaults.r,
+			g = defaults.g,
+			b = defaults.b,
+		})
+		PvPTogether:RefreshOptionsWindow()
+	end)
 
 	local friendlyPlayerStyle = CreateStyleDropdown(
 		frame,
@@ -399,6 +447,21 @@ function PvPTogether:InitializeOptionsWindow()
 		320,
 		-312
 	)
+	friendlyPlayerBorderColor:ClearAllPoints()
+	friendlyPlayerBorderColor:SetPoint("LEFT", friendlyPlayerBorderEnabled.Label, "RIGHT", 24, 0)
+	local resetFriendlyPlayerBorderColor = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	resetFriendlyPlayerBorderColor:SetSize(70, 20)
+	resetFriendlyPlayerBorderColor:SetPoint("LEFT", friendlyPlayerBorderColor, "RIGHT", 56, 0)
+	resetFriendlyPlayerBorderColor:SetText("Reset")
+	resetFriendlyPlayerBorderColor:SetScript("OnClick", function()
+		local defaults = PvPTogether.DEFAULTS.friendlyPlayerBorderColor
+		PvPTogether:SetOption("friendlyPlayerBorderColor", {
+			r = defaults.r,
+			g = defaults.g,
+			b = defaults.b,
+		})
+		PvPTogether:RefreshOptionsWindow()
+	end)
 
 	local enemyPlayerStyle = CreateStyleDropdown(
 		frame,
@@ -425,6 +488,21 @@ function PvPTogether:InitializeOptionsWindow()
 		320,
 		-436
 	)
+	enemyPlayerBorderColor:ClearAllPoints()
+	enemyPlayerBorderColor:SetPoint("LEFT", enemyPlayerBorderEnabled.Label, "RIGHT", 24, 0)
+	local resetEnemyPlayerBorderColor = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+	resetEnemyPlayerBorderColor:SetSize(70, 20)
+	resetEnemyPlayerBorderColor:SetPoint("LEFT", enemyPlayerBorderColor, "RIGHT", 56, 0)
+	resetEnemyPlayerBorderColor:SetText("Reset")
+	resetEnemyPlayerBorderColor:SetScript("OnClick", function()
+		local defaults = PvPTogether.DEFAULTS.enemyPlayerBorderColor
+		PvPTogether:SetOption("enemyPlayerBorderColor", {
+			r = defaults.r,
+			g = defaults.g,
+			b = defaults.b,
+		})
+		PvPTogether:RefreshOptionsWindow()
+	end)
 
 	if not partyMemberStyle or not friendlyPlayerStyle or not enemyPlayerStyle then
 		local missingDropdownWarning = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -446,10 +524,13 @@ function PvPTogether:InitializeOptionsWindow()
 		enemyPlayerStyle = enemyPlayerStyle,
 		partyMemberBorderEnabled = partyMemberBorderEnabled,
 		partyMemberBorderColor = partyMemberBorderColor,
+		resetPartyMemberBorderColor = resetPartyMemberBorderColor,
 		friendlyPlayerBorderEnabled = friendlyPlayerBorderEnabled,
 		friendlyPlayerBorderColor = friendlyPlayerBorderColor,
+		resetFriendlyPlayerBorderColor = resetFriendlyPlayerBorderColor,
 		enemyPlayerBorderEnabled = enemyPlayerBorderEnabled,
 		enemyPlayerBorderColor = enemyPlayerBorderColor,
+		resetEnemyPlayerBorderColor = resetEnemyPlayerBorderColor,
 	}
 
 	frame:SetScript("OnShow", function()
