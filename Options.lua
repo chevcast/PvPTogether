@@ -719,8 +719,47 @@ function PvPTogether:StartOptionsPreviewTicker()
 			return
 		end
 		PvPTogether:RandomizeOptionsPreviewClasses()
-		PvPTogether:RefreshOptionsWindow()
+		PvPTogether:RefreshOptionsPreviewsOnly()
 	end)
+end
+
+function PvPTogether:RefreshOptionsPreviewsOnly()
+	local controls = self.optionControls or {}
+	local enabled = self:GetOption("enabled") == true
+	local partyStyleValue = self:GetConfiguredStyleForUnitKind("partyMember")
+	local friendlyStyleValue = self:GetConfiguredStyleForUnitKind("friendlyPlayer")
+	local enemyStyleValue = self:GetConfiguredStyleForUnitKind("enemyPlayer")
+	local partyBorderEnabled = self:GetOption("partyMemberBorderEnabled") == true
+	local friendlyBorderEnabled = self:GetOption("friendlyPlayerBorderEnabled") == true
+	local enemyBorderEnabled = self:GetOption("enemyPlayerBorderEnabled") == true
+	local partyBorderColor = self:GetConfiguredBorderColorForUnitKind("partyMember")
+	local friendlyBorderColor = self:GetConfiguredBorderColorForUnitKind("friendlyPlayer")
+	local enemyBorderColor = self:GetConfiguredBorderColorForUnitKind("enemyPlayer")
+
+	RefreshNameplatePreview(
+		controls.partyMemberPreview,
+		"partyMember",
+		partyStyleValue,
+		partyBorderEnabled,
+		partyBorderColor,
+		enabled
+	)
+	RefreshNameplatePreview(
+		controls.friendlyPlayerPreview,
+		"friendlyPlayer",
+		friendlyStyleValue,
+		friendlyBorderEnabled,
+		friendlyBorderColor,
+		enabled
+	)
+	RefreshNameplatePreview(
+		controls.enemyPlayerPreview,
+		"enemyPlayer",
+		enemyStyleValue,
+		enemyBorderEnabled,
+		enemyBorderColor,
+		enabled
+	)
 end
 
 function PvPTogether:RefreshOptionsWindow()
@@ -734,15 +773,9 @@ function PvPTogether:RefreshOptionsWindow()
 	local partyStyleLabel, partySelectedValue = GetStyleDropdownLabel("partyMemberStyle")
 	local friendlyStyleLabel, friendlySelectedValue = GetStyleDropdownLabel("friendlyPlayerStyle")
 	local enemyStyleLabel, enemySelectedValue = GetStyleDropdownLabel("enemyPlayerStyle")
-	local partyStyleValue = self:GetConfiguredStyleForUnitKind("partyMember")
-	local friendlyStyleValue = self:GetConfiguredStyleForUnitKind("friendlyPlayer")
-	local enemyStyleValue = self:GetConfiguredStyleForUnitKind("enemyPlayer")
 	local partyBorderEnabled = self:GetOption("partyMemberBorderEnabled") == true
 	local friendlyBorderEnabled = self:GetOption("friendlyPlayerBorderEnabled") == true
 	local enemyBorderEnabled = self:GetOption("enemyPlayerBorderEnabled") == true
-	local partyBorderColor = self:GetConfiguredBorderColorForUnitKind("partyMember")
-	local friendlyBorderColor = self:GetConfiguredBorderColorForUnitKind("friendlyPlayer")
-	local enemyBorderColor = self:GetConfiguredBorderColorForUnitKind("enemyPlayer")
 
 	RefreshDropdownControl(controls.partyMemberStyle, partyStyleLabel, partySelectedValue)
 	RefreshDropdownControl(controls.friendlyPlayerStyle, friendlyStyleLabel, friendlySelectedValue)
@@ -816,30 +849,7 @@ function PvPTogether:RefreshOptionsWindow()
 	SetColorSwatchEnabled(controls.friendlyPlayerBorderColor, enabled and friendlyBorderEnabled)
 	SetColorSwatchEnabled(controls.enemyPlayerBorderColor, enabled and enemyBorderEnabled)
 
-	RefreshNameplatePreview(
-		controls.partyMemberPreview,
-		"partyMember",
-		partyStyleValue,
-		partyBorderEnabled,
-		partyBorderColor,
-		enabled
-	)
-	RefreshNameplatePreview(
-		controls.friendlyPlayerPreview,
-		"friendlyPlayer",
-		friendlyStyleValue,
-		friendlyBorderEnabled,
-		friendlyBorderColor,
-		enabled
-	)
-	RefreshNameplatePreview(
-		controls.enemyPlayerPreview,
-		"enemyPlayer",
-		enemyStyleValue,
-		enemyBorderEnabled,
-		enemyBorderColor,
-		enabled
-	)
+	self:RefreshOptionsPreviewsOnly()
 end
 
 function PvPTogether:OpenOptionsWindow()
