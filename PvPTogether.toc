@@ -1,0 +1,10 @@
+## Interface: 120000, 120001
+## Title: PvPTogether
+## Version: 0.1.0
+## Notes: Per-unit-type Blizzard nameplate style overrides.
+## SavedVariablesPerCharacter: PvPTogetherDBChar
+## Author: Chev
+
+Core.lua
+Nameplates.lua
+Options.lua
