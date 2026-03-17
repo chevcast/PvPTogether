@@ -713,7 +713,7 @@ function PvPTogether:StartOptionsPreviewTicker()
 		return
 	end
 
-	self.optionsPreviewTicker = C_Timer.NewTicker(1, function()
+	self.optionsPreviewTicker = C_Timer.NewTicker(3, function()
 		if not (PvPTogether.optionsFrame and PvPTogether.optionsFrame.IsShown and PvPTogether.optionsFrame:IsShown()) then
 			PvPTogether:StopOptionsPreviewTicker()
 			return
