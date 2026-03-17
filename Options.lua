@@ -18,6 +18,8 @@ local PREVIEW_LEFT = 360
 local PREVIEW_FRAME_WIDTH = 250
 local PREVIEW_FRAME_HEIGHT = 92
 local PREVIEW_BAR_WIDTH = 170
+local PREVIEW_NAME_BLOCK_HEIGHT = 20
+local PREVIEW_NAME_TO_BAR_GAP = 2
 local PREVIEW_DEFAULT_BORDER_ALPHA = 0.22
 local PREVIEW_OVERRIDE_BORDER_ALPHA = 1.0
 
@@ -59,6 +61,155 @@ local PREVIEW_NAME_BY_UNIT_KIND = {
 	friendlyPlayer = "Friendly Player",
 	enemyPlayer = "Enemy Player",
 }
+local PREVIEW_FALLBACK_CLASS_COLORS = {
+	{ r = 0.78, g = 0.61, b = 0.43, className = "Warrior" },
+	{ r = 1.00, g = 0.49, b = 0.04, className = "Druid" },
+	{ r = 0.41, g = 0.80, b = 0.94, className = "Mage" },
+	{ r = 0.96, g = 0.55, b = 0.73, className = "Paladin" },
+	{ r = 0.67, g = 0.83, b = 0.45, className = "Hunter" },
+	{ r = 0.00, g = 0.44, b = 0.87, className = "Shaman" },
+	{ r = 0.58, g = 0.51, b = 0.79, className = "Warlock" },
+	{ r = 1.00, g = 1.00, b = 1.00, className = "Priest" },
+	{ r = 1.00, g = 0.96, b = 0.41, className = "Rogue" },
+	{ r = 0.77, g = 0.12, b = 0.23, className = "Death Knight" },
+	{ r = 0.00, g = 1.00, b = 0.60, className = "Monk" },
+	{ r = 0.64, g = 0.19, b = 0.79, className = "Demon Hunter" },
+	{ r = 0.20, g = 0.58, b = 0.50, className = "Evoker" },
+}
+
+local previewClassColorPool = nil
+
+local function GetLocalizedClassName(classToken, fallback)
+	if type(classToken) ~= "string" or classToken == "" then
+		return fallback
+	end
+
+	local localizedClassName = nil
+	if type(LOCALIZED_CLASS_NAMES_MALE) == "table" then
+		localizedClassName = LOCALIZED_CLASS_NAMES_MALE[classToken]
+	end
+	if (not localizedClassName or localizedClassName == "") and type(LOCALIZED_CLASS_NAMES_FEMALE) == "table" then
+		localizedClassName = LOCALIZED_CLASS_NAMES_FEMALE[classToken]
+	end
+	if type(localizedClassName) == "string" and localizedClassName ~= "" then
+		return localizedClassName
+	end
+	return fallback
+end
+
+local function BuildPreviewClassColorPool()
+	local pool = {}
+
+	local function AddColor(red, green, blue, className)
+		local r = PvPTogether:SafeToNumber(red)
+		local g = PvPTogether:SafeToNumber(green)
+		local b = PvPTogether:SafeToNumber(blue)
+		if r == nil or g == nil or b == nil then
+			return
+		end
+		if r < 0 or r > 1 or g < 0 or g > 1 or b < 0 or b > 1 then
+			return
+		end
+		pool[#pool + 1] = {
+			r = r,
+			g = g,
+			b = b,
+			className = (type(className) == "string" and className ~= "") and className or "Player",
+		}
+	end
+
+	local function AddClassColorByToken(classToken)
+		if type(classToken) ~= "string" or classToken == "" then
+			return
+		end
+
+		local className = GetLocalizedClassName(classToken, nil)
+		if type(className) ~= "string" or className == "" then
+			return
+		end
+
+		local classColor = nil
+		if type(RAID_CLASS_COLORS) == "table" then
+			classColor = RAID_CLASS_COLORS[classToken]
+		end
+		if type(classColor) == "table" then
+			AddColor(classColor.r, classColor.g, classColor.b, className)
+			return
+		end
+
+		if C_ClassColor and type(C_ClassColor.GetClassColor) == "function" then
+			classColor = C_ClassColor.GetClassColor(classToken)
+			if type(classColor) == "table" then
+				local red, green, blue = classColor.r, classColor.g, classColor.b
+				if type(classColor.GetRGB) == "function" then
+					local okColor, r, g, b = pcall(classColor.GetRGB, classColor)
+					if okColor then
+						red, green, blue = r, g, b
+					end
+				end
+				AddColor(red, green, blue, className)
+			end
+		end
+	end
+
+	if type(CLASS_SORT_ORDER) == "table" then
+		for _, classToken in ipairs(CLASS_SORT_ORDER) do
+			AddClassColorByToken(classToken)
+		end
+	end
+
+	if #pool == 0 and type(RAID_CLASS_COLORS) == "table" then
+		for classToken in pairs(RAID_CLASS_COLORS) do
+			AddClassColorByToken(classToken)
+		end
+	end
+
+	if #pool == 0 then
+		for _, classColor in ipairs(PREVIEW_FALLBACK_CLASS_COLORS) do
+			AddColor(classColor.r, classColor.g, classColor.b, classColor.className)
+		end
+	end
+
+	return pool
+end
+
+local function GetRandomPreviewClassInfo()
+	if type(previewClassColorPool) ~= "table" or #previewClassColorPool == 0 then
+		previewClassColorPool = BuildPreviewClassColorPool()
+	end
+
+	if type(previewClassColorPool) ~= "table" or #previewClassColorPool == 0 then
+		return {
+			r = 0.22,
+			g = 0.80,
+			b = 0.22,
+			className = "Player",
+		}
+	end
+
+	local randomIndex = math.random(1, #previewClassColorPool)
+	local randomInfo = previewClassColorPool[randomIndex]
+	return {
+		r = randomInfo.r,
+		g = randomInfo.g,
+		b = randomInfo.b,
+		className = randomInfo.className,
+	}
+end
+
+local function AssignRandomClassInfoToPreview(previewFrame)
+	if type(previewFrame) ~= "table" then
+		return
+	end
+
+	local randomClassInfo = GetRandomPreviewClassInfo()
+	previewFrame.HealthColor = {
+		r = randomClassInfo.r,
+		g = randomClassInfo.g,
+		b = randomClassInfo.b,
+	}
+	previewFrame.HealthClassName = randomClassInfo.className
+end
 
 local function IsFrameForbidden(frame)
 	if not frame or type(frame.IsForbidden) ~= "function" then
@@ -116,14 +267,24 @@ local function CreateNameplatePreview(parent, x, y)
 	previewFrame.OuterBorder = outerBorder
 
 	local plateFrame = CreateFrame("Frame", nil, previewFrame)
-	plateFrame:SetPoint("TOPLEFT", previewFrame, "TOPLEFT", 14, -14)
-	plateFrame:SetSize(PREVIEW_BAR_WIDTH + 34, 62)
+	plateFrame:SetPoint("CENTER", previewFrame, "CENTER", 0, 0)
+	plateFrame:SetSize(PREVIEW_BAR_WIDTH, 62)
 	previewFrame.PlateFrame = plateFrame
 
 	local healthContainer = CreateFrame("Frame", nil, plateFrame)
-	healthContainer:SetPoint("TOPLEFT", plateFrame, "TOPLEFT", 0, -16)
+	healthContainer:SetPoint("CENTER", plateFrame, "CENTER", 0, 0)
 	healthContainer:SetSize(PREVIEW_BAR_WIDTH, 18)
 	previewFrame.HealthContainer = healthContainer
+
+	local textOverlay = CreateFrame("Frame", nil, plateFrame)
+	textOverlay:SetAllPoints(plateFrame)
+	textOverlay:SetFrameStrata(plateFrame:GetFrameStrata() or "LOW")
+	local overlayBaseLevel = healthContainer.GetFrameLevel and healthContainer:GetFrameLevel() or 0
+	if type(overlayBaseLevel) ~= "number" then
+		overlayBaseLevel = 0
+	end
+	textOverlay:SetFrameLevel(overlayBaseLevel + 20)
+	previewFrame.TextOverlay = textOverlay
 
 	local healthBar = CreateFrame("StatusBar", nil, healthContainer)
 	healthBar:SetAllPoints()
@@ -150,7 +311,8 @@ local function CreateNameplatePreview(parent, x, y)
 		baseFill:SetTexture("Interface\\Buttons\\WHITE8X8")
 	end
 	AnchorPreviewFillTexture(baseFill, healthBar)
-	SetTextureTint(baseFill, 0.22, 0.80, 0.22, 1.0)
+	AssignRandomClassInfoToPreview(previewFrame)
+	SetTextureTint(baseFill, previewFrame.HealthColor.r, previewFrame.HealthColor.g, previewFrame.HealthColor.b, 1.0)
 	previewFrame.HealthFill = baseFill
 
 	local selectedBorder = healthBar:CreateTexture(nil, "OVERLAY", nil, 4)
@@ -163,27 +325,19 @@ local function CreateNameplatePreview(parent, x, y)
 	selectedBorder:SetPoint("BOTTOMRIGHT", healthBarBackground, "BOTTOMRIGHT", -3, 3)
 	previewFrame.BorderTexture = selectedBorder
 
-	local nameLabel = plateFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	local nameLabel = textOverlay:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	if nameLabel.SetDrawLayer then
+		nameLabel:SetDrawLayer("OVERLAY", 7)
+	end
 	nameLabel:SetJustifyH("LEFT")
+	if nameLabel.SetWordWrap then
+		nameLabel:SetWordWrap(false)
+	end
+	if nameLabel.SetMaxLines then
+		nameLabel:SetMaxLines(1)
+	end
 	nameLabel:SetText("Player")
 	previewFrame.NameLabel = nameLabel
-
-	local healthText = plateFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	healthText:SetJustifyH("RIGHT")
-	healthText:SetText("241 K")
-	previewFrame.HealthText = healthText
-
-	local styleLabel = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	styleLabel:SetPoint("BOTTOMLEFT", previewFrame, "BOTTOMLEFT", 12, 7)
-	styleLabel:SetJustifyH("LEFT")
-	styleLabel:SetText("")
-	previewFrame.StyleLabel = styleLabel
-
-	local borderLabel = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	borderLabel:SetPoint("BOTTOMRIGHT", previewFrame, "BOTTOMRIGHT", -12, 7)
-	borderLabel:SetJustifyH("RIGHT")
-	borderLabel:SetText("")
-	previewFrame.BorderLabel = borderLabel
 
 	return previewFrame
 end
@@ -194,17 +348,18 @@ local function RefreshNameplatePreview(previewFrame, unitKind, styleValue, borde
 	end
 
 	local layout = GetPreviewLayoutForStyle(styleValue)
+	local plateFrame = previewFrame.PlateFrame
 	local healthContainer = previewFrame.HealthContainer
+	local textOverlay = previewFrame.TextOverlay
 	local nameLabel = previewFrame.NameLabel
-	local healthText = previewFrame.HealthText
+	local healthFill = previewFrame.HealthFill
 	local borderTexture = previewFrame.BorderTexture
-	local styleLabel = previewFrame.StyleLabel
-	local borderLabel = previewFrame.BorderLabel
 
 	if
-		not IsFrameMutable(healthContainer)
+		not IsFrameMutable(plateFrame)
+		or not IsFrameMutable(healthContainer)
+		or not IsFrameMutable(textOverlay)
 		or not IsFrameMutable(nameLabel)
-		or not IsFrameMutable(healthText)
 		or not IsFrameMutable(borderTexture)
 	then
 		return
@@ -214,43 +369,75 @@ local function RefreshNameplatePreview(previewFrame, unitKind, styleValue, borde
 	if type(normalizedColor) ~= "table" then
 		normalizedColor = { r = 1.0, g = 1.0, b = 1.0 }
 	end
+	local previewHealthColor = previewFrame.HealthColor
+	if type(previewHealthColor) ~= "table" then
+		local fallbackClassInfo = GetRandomPreviewClassInfo()
+		previewHealthColor = {
+			r = fallbackClassInfo.r,
+			g = fallbackClassInfo.g,
+			b = fallbackClassInfo.b,
+		}
+		previewFrame.HealthColor = previewHealthColor
+		previewFrame.HealthClassName = fallbackClassInfo.className
+	end
+	local previewClassName = previewFrame.HealthClassName
+	if type(previewClassName) ~= "string" or previewClassName == "" then
+		previewClassName = "Player"
+	end
+	local previewName = PREVIEW_NAME_BY_UNIT_KIND[unitKind] or "Player"
+	if unitKind == "partyMember" then
+		previewName = "Party " .. previewClassName
+	elseif unitKind == "friendlyPlayer" then
+		previewName = "Friendly " .. previewClassName
+	elseif unitKind == "enemyPlayer" then
+		previewName = "Enemy " .. previewClassName
+	end
+	nameLabel:SetText(previewName)
+
+	local contentHeight = layout.healthBarHeight
+	if not layout.nameInsideHealthBar then
+		contentHeight = layout.healthBarHeight + PREVIEW_NAME_TO_BAR_GAP + PREVIEW_NAME_BLOCK_HEIGHT
+	end
+	plateFrame:ClearAllPoints()
+	plateFrame:SetPoint("CENTER", previewFrame, "CENTER", 0, 0)
+	plateFrame:SetSize(PREVIEW_BAR_WIDTH, contentHeight)
 
 	healthContainer:ClearAllPoints()
-	healthContainer:SetPoint("TOPLEFT", previewFrame.PlateFrame, "TOPLEFT", 0, layout.nameInsideHealthBar and -18 or -26)
+	if layout.nameInsideHealthBar then
+		healthContainer:SetPoint("CENTER", plateFrame, "CENTER", 0, 0)
+	else
+		healthContainer:SetPoint("BOTTOM", plateFrame, "BOTTOM", 0, 0)
+	end
 	healthContainer:SetSize(PREVIEW_BAR_WIDTH, layout.healthBarHeight)
+	if textOverlay.SetFrameLevel and healthContainer.GetFrameLevel then
+		local dynamicOverlayBaseLevel = healthContainer:GetFrameLevel()
+		if type(dynamicOverlayBaseLevel) == "number" then
+			textOverlay:SetFrameLevel(dynamicOverlayBaseLevel + 20)
+		end
+	end
 
 	nameLabel:ClearAllPoints()
-	healthText:ClearAllPoints()
 
 	if layout.nameInsideHealthBar then
 		nameLabel:SetPoint("LEFT", healthContainer, "LEFT", 6, 0)
-		nameLabel:SetPoint("RIGHT", healthContainer, "RIGHT", -56, 0)
-		healthText:SetPoint("RIGHT", healthContainer, "RIGHT", -6, 0)
+		nameLabel:SetPoint("RIGHT", healthContainer, "RIGHT", -6, 0)
 	else
-		nameLabel:SetPoint("BOTTOMLEFT", healthContainer, "TOPLEFT", 6, 2)
-		nameLabel:SetPoint("BOTTOMRIGHT", healthContainer, "TOPRIGHT", -56, 2)
-		healthText:SetPoint("BOTTOMRIGHT", healthContainer, "TOPRIGHT", -6, 2)
+		nameLabel:SetPoint("BOTTOMLEFT", healthContainer, "TOPLEFT", 6, PREVIEW_NAME_TO_BAR_GAP)
+		nameLabel:SetPoint("BOTTOMRIGHT", healthContainer, "TOPRIGHT", -6, PREVIEW_NAME_TO_BAR_GAP)
 	end
 
-	local previewName = PREVIEW_NAME_BY_UNIT_KIND[unitKind] or "Player"
-	nameLabel:SetText(previewName)
 	if layout.nameColorBySelection and nameLabel.SetTextColor then
 		nameLabel:SetTextColor(1, 0.14, 0.14, 1)
 	elseif nameLabel.SetTextColor then
 		nameLabel:SetTextColor(1, 1, 1, 1)
 	end
 
-	healthText:SetText("241 K")
+	if IsFrameMutable(healthFill) then
+		SetTextureTint(healthFill, previewHealthColor.r, previewHealthColor.g, previewHealthColor.b, 1.0)
+	end
 
 	local borderAlpha = borderEnabled and PREVIEW_OVERRIDE_BORDER_ALPHA or PREVIEW_DEFAULT_BORDER_ALPHA
 	SetTextureTint(borderTexture, normalizedColor.r, normalizedColor.g, normalizedColor.b, borderAlpha)
-
-	if styleLabel then
-		styleLabel:SetText("Style: " .. PvPTogether:GetNameplateStyleLabel(styleValue))
-	end
-	if borderLabel then
-		borderLabel:SetText(borderEnabled and "Border: On" or "Border: Off")
-	end
 
 	previewFrame:SetAlpha(addonEnabled and 1 or 0.5)
 end
@@ -495,6 +682,45 @@ local function SetColorSwatchEnabled(swatch, enabled)
 	if swatch.ColorTexture then
 		swatch.ColorTexture:SetAlpha(enabled and 1 or 0.5)
 	end
+end
+
+function PvPTogether:RandomizeOptionsPreviewClasses()
+	local controls = self.optionControls
+	if type(controls) ~= "table" then
+		return
+	end
+
+	AssignRandomClassInfoToPreview(controls.partyMemberPreview)
+	AssignRandomClassInfoToPreview(controls.friendlyPlayerPreview)
+	AssignRandomClassInfoToPreview(controls.enemyPlayerPreview)
+end
+
+function PvPTogether:StopOptionsPreviewTicker()
+	local ticker = self.optionsPreviewTicker
+	self.optionsPreviewTicker = nil
+	if ticker and type(ticker.Cancel) == "function" then
+		pcall(ticker.Cancel, ticker)
+	end
+end
+
+function PvPTogether:StartOptionsPreviewTicker()
+	self:StopOptionsPreviewTicker()
+
+	if not (self.optionsFrame and self.optionsFrame.IsShown and self.optionsFrame:IsShown()) then
+		return
+	end
+	if not (C_Timer and type(C_Timer.NewTicker) == "function") then
+		return
+	end
+
+	self.optionsPreviewTicker = C_Timer.NewTicker(1, function()
+		if not (PvPTogether.optionsFrame and PvPTogether.optionsFrame.IsShown and PvPTogether.optionsFrame:IsShown()) then
+			PvPTogether:StopOptionsPreviewTicker()
+			return
+		end
+		PvPTogether:RandomizeOptionsPreviewClasses()
+		PvPTogether:RefreshOptionsWindow()
+	end)
 end
 
 function PvPTogether:RefreshOptionsWindow()
@@ -810,7 +1036,12 @@ function PvPTogether:InitializeOptionsWindow()
 	}
 
 	frame:SetScript("OnShow", function()
+		PvPTogether:RandomizeOptionsPreviewClasses()
 		PvPTogether:RefreshOptionsWindow()
+		PvPTogether:StartOptionsPreviewTicker()
+	end)
+	frame:SetScript("OnHide", function()
+		PvPTogether:StopOptionsPreviewTicker()
 	end)
 
 	self.optionsFrame = frame
