@@ -56,8 +56,8 @@ local PREVIEW_STYLE_LAYOUTS = {
 }
 
 local PREVIEW_NAME_BY_UNIT_KIND = {
-	partyMember = "Party Ally",
-	friendlyPlayer = "Friendly",
+	partyMember = "Party Member",
+	friendlyPlayer = "Friendly Player",
 	enemyPlayer = "Enemy Player",
 }
 
@@ -107,13 +107,13 @@ local function CreateNameplatePreview(parent, x, y)
 
 	local background = previewFrame:CreateTexture(nil, "BACKGROUND")
 	background:SetAllPoints()
-	background:SetColorTexture(0.03, 0.03, 0.05, 0.62)
+	background:SetColorTexture(0, 0, 0, 0.82)
 	previewFrame.Background = background
 
 	local outerBorder = previewFrame:CreateTexture(nil, "BORDER")
 	outerBorder:SetPoint("TOPLEFT", previewFrame, "TOPLEFT", 0, 0)
 	outerBorder:SetPoint("BOTTOMRIGHT", previewFrame, "BOTTOMRIGHT", 0, 0)
-	outerBorder:SetColorTexture(0.93, 0.84, 0.40, 0.14)
+	outerBorder:SetColorTexture(0, 0, 0, 0.24)
 	previewFrame.OuterBorder = outerBorder
 
 	local plateFrame = CreateFrame("Frame", nil, previewFrame)
