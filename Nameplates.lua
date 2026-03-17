@@ -30,7 +30,7 @@ local FALLBACK_NAME_PLATE_SCALES = {
 	[SIZE_HUGE] = { horizontal = 1.6, vertical = 1.6, classification = 1.6, aura = 1.6 },
 }
 local BORDER_TINT_TEXTURE_ATLAS = "UI-HUD-Nameplates-Selected"
-local BORDER_TINT_TEXTURE_ALPHA = 0.92
+local BORDER_TINT_TEXTURE_ALPHA = 1.0
 local BORDER_GLOW_TEXTURE_ALPHA = 0.35
 local BORDER_GLOW_OUTSET = 4
 

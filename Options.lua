@@ -6,6 +6,8 @@ end
 
 PvPTogether.optionControls = PvPTogether.optionControls or {}
 local INHERIT_STYLE_DROPDOWN_VALUE = "__pvptogether_inherit_style__"
+local INHERIT_STYLE_SELECTED_LABEL = "Inherit From Global"
+local INHERIT_STYLE_MENU_LABEL = "Inherit From Global Setting"
 
 local function GetStyleDropdownLabel(optionKey)
 	local configuredStyle = PvPTogether:GetOption(optionKey)
@@ -13,9 +15,7 @@ local function GetStyleDropdownLabel(optionKey)
 		return PvPTogether:GetNameplateStyleLabel(configuredStyle), configuredStyle
 	end
 
-	local globalStyle = PvPTogether:GetCurrentGlobalNameplateStyle()
-	local globalStyleLabel = PvPTogether:GetNameplateStyleLabel(globalStyle)
-	return "Inherit (Global: " .. globalStyleLabel .. ")", INHERIT_STYLE_DROPDOWN_VALUE
+	return INHERIT_STYLE_SELECTED_LABEL, INHERIT_STYLE_DROPDOWN_VALUE
 end
 
 local function CreateCheckbox(parent, optionKey, labelText, tooltipText, x, y)
@@ -60,13 +60,12 @@ local function CreateDropdown(parent, titleText, tooltipText, x, y, width, initi
 end
 
 local function CreateStyleDropdown(parent, titleText, tooltipText, x, y, optionKey)
-	return CreateDropdown(parent, titleText, tooltipText, x, y, 220, function(_, level)
-		local inheritInfo = UIDropDownMenu_CreateInfo()
-		local inheritLabel = GetStyleDropdownLabel(optionKey)
-		inheritInfo.text = inheritLabel
-		inheritInfo.value = INHERIT_STYLE_DROPDOWN_VALUE
-		inheritInfo.checked = not PvPTogether:IsNameplateStyle(PvPTogether:GetOption(optionKey))
-		inheritInfo.func = function()
+		return CreateDropdown(parent, titleText, tooltipText, x, y, 220, function(_, level)
+			local inheritInfo = UIDropDownMenu_CreateInfo()
+			inheritInfo.text = INHERIT_STYLE_MENU_LABEL
+			inheritInfo.value = INHERIT_STYLE_DROPDOWN_VALUE
+			inheritInfo.checked = not PvPTogether:IsNameplateStyle(PvPTogether:GetOption(optionKey))
+			inheritInfo.func = function()
 			PvPTogether:SetOption(optionKey, nil)
 			PvPTogether:RefreshOptionsWindow()
 			CloseDropDownMenus()
@@ -392,7 +391,7 @@ function PvPTogether:InitializeOptionsWindow()
 	local partyMemberBorderEnabled = CreateCheckbox(
 		frame,
 		"partyMemberBorderEnabled",
-		"Border Override",
+		"Border Color",
 		"Enable a custom border tint for party or raid member nameplates.",
 		36,
 		-188
@@ -433,7 +432,7 @@ function PvPTogether:InitializeOptionsWindow()
 	local friendlyPlayerBorderEnabled = CreateCheckbox(
 		frame,
 		"friendlyPlayerBorderEnabled",
-		"Border Override",
+		"Border Color",
 		"Enable a custom border tint for non-group friendly player nameplates.",
 		36,
 		-312
@@ -474,7 +473,7 @@ function PvPTogether:InitializeOptionsWindow()
 	local enemyPlayerBorderEnabled = CreateCheckbox(
 		frame,
 		"enemyPlayerBorderEnabled",
-		"Border Override",
+		"Border Color",
 		"Enable a custom border tint for enemy player nameplates.",
 		36,
 		-436
@@ -511,12 +510,6 @@ function PvPTogether:InitializeOptionsWindow()
 		missingDropdownWarning:SetJustifyH("LEFT")
 		missingDropdownWarning:SetText("Dropdown UI is unavailable on this client build; style selectors could not be created.")
 	end
-
-	local warningText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	warningText:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -488)
-	warningText:SetWidth(680)
-	warningText:SetJustifyH("LEFT")
-	warningText:SetText("Changes are deferred until combat ends when needed to avoid taint-sensitive updates.")
 
 	self.optionControls = {
 		partyMemberStyle = partyMemberStyle,
