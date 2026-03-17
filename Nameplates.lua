@@ -47,6 +47,18 @@ local function CanMutateFrame(frame)
 	return frame ~= nil and not IsFrameForbidden(frame)
 end
 
+local function GetParentFrameSafely(frame)
+	if not frame or type(frame.GetParent) ~= "function" then
+		return nil
+	end
+
+	local okParent, parentFrame = pcall(frame.GetParent, frame)
+	if not okParent then
+		return nil
+	end
+	return parentFrame
+end
+
 local function GetNumericCVar(cvarName, fallbackValue)
 	if not (C_CVar and type(C_CVar.GetCVar) == "function" and type(cvarName) == "string") then
 		return fallbackValue
@@ -276,12 +288,35 @@ local function ResolveUnitKindFromUnitFrame(unitFrame)
 		end
 	end
 
-	local parentFrame = unitFrame.GetParent and unitFrame:GetParent() or nil
+	local parentFrame = GetParentFrameSafely(unitFrame)
 	if parentFrame then
 		return ResolveUnitKind(parentFrame)
 	end
 
 	return nil
+end
+
+function PvPTogether:IsNameplateAugmentationBlockedInCurrentContext()
+	if type(IsInInstance) ~= "function" then
+		return false
+	end
+
+	local okInstance, isInInstance = pcall(IsInInstance)
+	return okInstance and isInInstance and true or false
+end
+
+function PvPTogether:HandleNameplateContextChange()
+	if not self.isEnabled then
+		return
+	end
+
+	if self:IsNameplateAugmentationBlockedInCurrentContext() then
+		self.pendingNameplateRefreshAfterCombat = false
+		self:ResetAllNameplateStylesToBlizzard()
+		return
+	end
+
+	self:ReapplyAllNameplateStyles()
 end
 
 local function ForEachVisibleNameplate(callbackFn)
@@ -897,6 +932,11 @@ function PvPTogether:ApplyPerTypeStyleToNameplateFrame(namePlateFrameBase)
 	if not self.isEnabled then
 		return
 	end
+	if self:IsNameplateAugmentationBlockedInCurrentContext() then
+		local unitFrame = namePlateFrameBase and namePlateFrameBase.UnitFrame or nil
+		self:HideBorderTintForUnitFrame(unitFrame)
+		return
+	end
 	if self:IsInCombatLockdown() then
 		self.pendingNameplateRefreshAfterCombat = true
 		return
@@ -936,6 +976,10 @@ function PvPTogether:ApplyPerTypeStyleGeometryToUnitFrame(unitFrame)
 	if not self.isEnabled then
 		return
 	end
+	if self:IsNameplateAugmentationBlockedInCurrentContext() then
+		self:HideBorderTintForUnitFrame(unitFrame)
+		return
+	end
 	if self:IsInCombatLockdown() then
 		self.pendingNameplateRefreshAfterCombat = true
 		return
@@ -944,7 +988,7 @@ function PvPTogether:ApplyPerTypeStyleGeometryToUnitFrame(unitFrame)
 		return
 	end
 
-	local namePlateFrameBase = unitFrame.GetParent and unitFrame:GetParent() or nil
+	local namePlateFrameBase = GetParentFrameSafely(unitFrame)
 	if not CanMutateFrame(namePlateFrameBase) then
 		return
 	end
@@ -974,6 +1018,19 @@ function PvPTogether:ReapplyAllNameplateStyles()
 	if not self.isEnabled then
 		return {
 			inCombat = false,
+			blocked = false,
+			tracked = 0,
+			tokens = 0,
+			fallback = 0,
+		}
+	end
+
+	if self:IsNameplateAugmentationBlockedInCurrentContext() then
+		self.pendingNameplateRefreshAfterCombat = false
+		self:HideAllBorderTintOverrides()
+		return {
+			inCombat = false,
+			blocked = true,
 			tracked = 0,
 			tokens = 0,
 			fallback = 0,
@@ -985,6 +1042,7 @@ function PvPTogether:ReapplyAllNameplateStyles()
 		self.pendingNameplateRefreshAfterCombat = true
 		return {
 			inCombat = true,
+			blocked = false,
 			tracked = 0,
 			tokens = 0,
 			fallback = 0,
@@ -995,6 +1053,7 @@ function PvPTogether:ReapplyAllNameplateStyles()
 	local refreshedByFrame = {}
 	local stats = {
 		inCombat = inCombat and true or false,
+		blocked = false,
 		tracked = 0,
 		tokens = 0,
 		fallback = 0,
@@ -1114,18 +1173,32 @@ function PvPTogether:TryInstallNameplateHooks()
 	end
 
 	hooksecurefunc(NamePlateBaseMixin, "ApplyFrameOptions", function(namePlateFrameBase)
+		if PvPTogether:IsNameplateAugmentationBlockedInCurrentContext() then
+			local unitFrame = namePlateFrameBase and namePlateFrameBase.UnitFrame or nil
+			PvPTogether:HideBorderTintForUnitFrame(unitFrame)
+			return
+		end
 		PvPTogether:TrackNameplateFrame(namePlateFrameBase)
 		PvPTogether:ApplyPerTypeStyleToNameplateFrame(namePlateFrameBase)
 	end)
 	if type(NamePlateUnitFrameMixin) == "table" then
 		hooksecurefunc(NamePlateUnitFrameMixin, "OnUnitSet", function(unitFrame)
-			local parentFrame = unitFrame and unitFrame.GetParent and unitFrame:GetParent() or nil
+			if PvPTogether:IsNameplateAugmentationBlockedInCurrentContext() then
+				PvPTogether:HideBorderTintForUnitFrame(unitFrame)
+				return
+			end
+
+			local parentFrame = GetParentFrameSafely(unitFrame)
 			if parentFrame then
 				PvPTogether:TrackNameplateFrame(parentFrame)
 				PvPTogether:ApplyPerTypeStyleToNameplateFrame(parentFrame)
 			end
 		end)
 		hooksecurefunc(NamePlateUnitFrameMixin, "UpdateAnchors", function(unitFrame)
+			if PvPTogether:IsNameplateAugmentationBlockedInCurrentContext() then
+				PvPTogether:HideBorderTintForUnitFrame(unitFrame)
+				return
+			end
 			PvPTogether:ApplyPerTypeStyleGeometryToUnitFrame(unitFrame)
 		end)
 	end
@@ -1146,7 +1219,7 @@ function PvPTogether:EnsureNameplateEventFrame()
 			if loadedAddon == "Blizzard_NamePlates" then
 				PvPTogether:TryInstallNameplateHooks()
 				if PvPTogether.isEnabled then
-					PvPTogether:ReapplyAllNameplateStyles()
+					PvPTogether:HandleNameplateContextChange()
 				end
 			end
 		elseif eventName == "NAME_PLATE_UNIT_ADDED" then
@@ -1154,13 +1227,23 @@ function PvPTogether:EnsureNameplateEventFrame()
 				return
 			end
 
-			if PvPTogether:IsInCombatLockdown() then
-				PvPTogether.pendingNameplateRefreshAfterCombat = true
+			local unitToken = ...
+			if type(unitToken) ~= "string" or unitToken == "" then
 				return
 			end
 
-			local unitToken = ...
-			if type(unitToken) ~= "string" or unitToken == "" then
+			if PvPTogether:IsNameplateAugmentationBlockedInCurrentContext() then
+				if C_NamePlate and type(C_NamePlate.GetNamePlateForUnit) == "function" then
+					local okFrame, frameBase = pcall(C_NamePlate.GetNamePlateForUnit, unitToken, false)
+					if okFrame and frameBase and frameBase.UnitFrame then
+						PvPTogether:HideBorderTintForUnitFrame(frameBase.UnitFrame)
+					end
+				end
+				return
+			end
+
+			if PvPTogether:IsInCombatLockdown() then
+				PvPTogether.pendingNameplateRefreshAfterCombat = true
 				return
 			end
 
@@ -1171,11 +1254,14 @@ function PvPTogether:EnsureNameplateEventFrame()
 				end
 			end
 		elseif eventName == "PLAYER_ENTERING_WORLD" then
-			if PvPTogether.isEnabled then
-				PvPTogether:ReapplyAllNameplateStyles()
-			end
+			PvPTogether:HandleNameplateContextChange()
+		elseif eventName == "ZONE_CHANGED_NEW_AREA" then
+			PvPTogether:HandleNameplateContextChange()
 		elseif eventName == "CVAR_UPDATE" then
 			if not PvPTogether.isEnabled then
+				return
+			end
+			if PvPTogether:IsNameplateAugmentationBlockedInCurrentContext() then
 				return
 			end
 
@@ -1190,7 +1276,7 @@ function PvPTogether:EnsureNameplateEventFrame()
 			end
 
 			if PvPTogether.pendingNameplateRefreshAfterCombat and PvPTogether.isEnabled then
-				PvPTogether:ReapplyAllNameplateStyles()
+				PvPTogether:HandleNameplateContextChange()
 			end
 		end
 	end)
@@ -1205,17 +1291,19 @@ function PvPTogether:EnableNameplateModule()
 	frame:RegisterEvent("ADDON_LOADED")
 	frame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
 	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+	frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
 	frame:RegisterEvent("CVAR_UPDATE")
 	frame:RegisterEvent("PLAYER_REGEN_ENABLED")
 
 	self:TryInstallNameplateHooks()
-	self:ReapplyAllNameplateStyles()
+	self:HandleNameplateContextChange()
 end
 
 function PvPTogether:DisableNameplateModule()
 	if self.nameplateEventFrame then
 		self.nameplateEventFrame:UnregisterEvent("NAME_PLATE_UNIT_ADDED")
 		self.nameplateEventFrame:UnregisterEvent("PLAYER_ENTERING_WORLD")
+		self.nameplateEventFrame:UnregisterEvent("ZONE_CHANGED_NEW_AREA")
 		self.nameplateEventFrame:UnregisterEvent("CVAR_UPDATE")
 		-- Keep PLAYER_REGEN_ENABLED in case a deferred reset is pending.
 	end
