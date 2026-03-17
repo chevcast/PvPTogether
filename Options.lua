@@ -20,7 +20,6 @@ local PREVIEW_FRAME_HEIGHT = 92
 local PREVIEW_BAR_WIDTH = 170
 local PREVIEW_DEFAULT_BORDER_ALPHA = 0.22
 local PREVIEW_OVERRIDE_BORDER_ALPHA = 1.0
-local PREVIEW_GLOW_ALPHA = 0.35
 
 local PREVIEW_STYLE_LAYOUTS = {
 	[STYLE_MODERN] = {
@@ -164,18 +163,6 @@ local function CreateNameplatePreview(parent, x, y)
 	selectedBorder:SetPoint("BOTTOMRIGHT", healthBarBackground, "BOTTOMRIGHT", -3, 3)
 	previewFrame.BorderTexture = selectedBorder
 
-	local borderGlow = healthBar:CreateTexture(nil, "OVERLAY", nil, 3)
-	if borderGlow.SetAtlas then
-		borderGlow:SetAtlas("UI-HUD-Nameplates-Selected", true)
-	else
-		borderGlow:SetTexture("Interface\\Buttons\\WHITE8X8")
-	end
-	borderGlow:SetBlendMode("ADD")
-	borderGlow:SetPoint("TOPLEFT", healthBarBackground, "TOPLEFT", -3, 3)
-	borderGlow:SetPoint("BOTTOMRIGHT", healthBarBackground, "BOTTOMRIGHT", -1, 5)
-	borderGlow:Hide()
-	previewFrame.BorderGlow = borderGlow
-
 	local nameLabel = plateFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	nameLabel:SetJustifyH("LEFT")
 	nameLabel:SetText("Player")
@@ -211,7 +198,6 @@ local function RefreshNameplatePreview(previewFrame, unitKind, styleValue, borde
 	local nameLabel = previewFrame.NameLabel
 	local healthText = previewFrame.HealthText
 	local borderTexture = previewFrame.BorderTexture
-	local borderGlow = previewFrame.BorderGlow
 	local styleLabel = previewFrame.StyleLabel
 	local borderLabel = previewFrame.BorderLabel
 
@@ -258,14 +244,6 @@ local function RefreshNameplatePreview(previewFrame, unitKind, styleValue, borde
 
 	local borderAlpha = borderEnabled and PREVIEW_OVERRIDE_BORDER_ALPHA or PREVIEW_DEFAULT_BORDER_ALPHA
 	SetTextureTint(borderTexture, normalizedColor.r, normalizedColor.g, normalizedColor.b, borderAlpha)
-	if IsFrameMutable(borderGlow) then
-		if borderEnabled then
-			SetTextureTint(borderGlow, normalizedColor.r, normalizedColor.g, normalizedColor.b, PREVIEW_GLOW_ALPHA)
-			borderGlow:Show()
-		else
-			borderGlow:Hide()
-		end
-	end
 
 	if styleLabel then
 		styleLabel:SetText("Style: " .. PvPTogether:GetNameplateStyleLabel(styleValue))
