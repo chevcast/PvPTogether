@@ -8,6 +8,274 @@ PvPTogether.optionControls = PvPTogether.optionControls or {}
 local INHERIT_STYLE_DROPDOWN_VALUE = "__pvptogether_inherit_style__"
 local INHERIT_STYLE_SELECTED_LABEL = "Inherit From Global"
 local INHERIT_STYLE_MENU_LABEL = "Inherit From Global Setting"
+local STYLE_MODERN = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.Modern or 0
+local STYLE_THIN = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.Thin or 1
+local STYLE_BLOCK = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.Block or 2
+local STYLE_HEALTH_FOCUS = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.HealthFocus or 3
+local STYLE_CAST_FOCUS = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.CastFocus or 4
+local STYLE_LEGACY = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.Legacy or 5
+local PREVIEW_LEFT = 360
+local PREVIEW_FRAME_WIDTH = 250
+local PREVIEW_FRAME_HEIGHT = 92
+local PREVIEW_BAR_WIDTH = 170
+local PREVIEW_DEFAULT_BORDER_ALPHA = 0.22
+local PREVIEW_OVERRIDE_BORDER_ALPHA = 1.0
+local PREVIEW_GLOW_ALPHA = 0.35
+
+local PREVIEW_STYLE_LAYOUTS = {
+	[STYLE_MODERN] = {
+		nameInsideHealthBar = true,
+		healthBarHeight = 18,
+		nameColorBySelection = false,
+	},
+	[STYLE_THIN] = {
+		nameInsideHealthBar = false,
+		healthBarHeight = 8,
+		nameColorBySelection = false,
+	},
+	[STYLE_BLOCK] = {
+		nameInsideHealthBar = true,
+		healthBarHeight = 18,
+		nameColorBySelection = false,
+	},
+	[STYLE_HEALTH_FOCUS] = {
+		nameInsideHealthBar = false,
+		healthBarHeight = 18,
+		nameColorBySelection = false,
+	},
+	[STYLE_CAST_FOCUS] = {
+		nameInsideHealthBar = false,
+		healthBarHeight = 8,
+		nameColorBySelection = false,
+	},
+	[STYLE_LEGACY] = {
+		nameInsideHealthBar = false,
+		healthBarHeight = 8,
+		nameColorBySelection = true,
+	},
+}
+
+local PREVIEW_NAME_BY_UNIT_KIND = {
+	partyMember = "Party Ally",
+	friendlyPlayer = "Friendly",
+	enemyPlayer = "Enemy Player",
+}
+
+local function IsFrameForbidden(frame)
+	if not frame or type(frame.IsForbidden) ~= "function" then
+		return false
+	end
+
+	local ok, isForbidden = pcall(frame.IsForbidden, frame)
+	return ok and isForbidden and true or false
+end
+
+local function IsFrameMutable(frame)
+	return frame ~= nil and not IsFrameForbidden(frame)
+end
+
+local function SetTextureTint(texture, red, green, blue, alpha)
+	if not IsFrameMutable(texture) then
+		return
+	end
+
+	if texture.SetVertexColor then
+		texture:SetVertexColor(red, green, blue, alpha)
+	elseif texture.SetColorTexture then
+		texture:SetColorTexture(red, green, blue, alpha)
+	end
+end
+
+local function AnchorPreviewFillTexture(texture, healthBar)
+	if not IsFrameMutable(texture) or not IsFrameMutable(healthBar) then
+		return
+	end
+
+	texture:ClearAllPoints()
+	texture:SetPoint("TOPLEFT", healthBar, "TOPLEFT", 0, 1)
+	texture:SetPoint("BOTTOMRIGHT", healthBar, "BOTTOMRIGHT", 0, -1)
+end
+
+local function GetPreviewLayoutForStyle(styleValue)
+	return PREVIEW_STYLE_LAYOUTS[styleValue] or PREVIEW_STYLE_LAYOUTS[STYLE_MODERN]
+end
+
+local function CreateNameplatePreview(parent, x, y)
+	local previewFrame = CreateFrame("Frame", nil, parent)
+	previewFrame:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+	previewFrame:SetSize(PREVIEW_FRAME_WIDTH, PREVIEW_FRAME_HEIGHT)
+
+	local background = previewFrame:CreateTexture(nil, "BACKGROUND")
+	background:SetAllPoints()
+	background:SetColorTexture(0.03, 0.03, 0.05, 0.62)
+	previewFrame.Background = background
+
+	local outerBorder = previewFrame:CreateTexture(nil, "BORDER")
+	outerBorder:SetPoint("TOPLEFT", previewFrame, "TOPLEFT", 0, 0)
+	outerBorder:SetPoint("BOTTOMRIGHT", previewFrame, "BOTTOMRIGHT", 0, 0)
+	outerBorder:SetColorTexture(0.93, 0.84, 0.40, 0.14)
+	previewFrame.OuterBorder = outerBorder
+
+	local plateFrame = CreateFrame("Frame", nil, previewFrame)
+	plateFrame:SetPoint("TOPLEFT", previewFrame, "TOPLEFT", 14, -14)
+	plateFrame:SetSize(PREVIEW_BAR_WIDTH + 34, 62)
+	previewFrame.PlateFrame = plateFrame
+
+	local healthContainer = CreateFrame("Frame", nil, plateFrame)
+	healthContainer:SetPoint("TOPLEFT", plateFrame, "TOPLEFT", 0, -16)
+	healthContainer:SetSize(PREVIEW_BAR_WIDTH, 18)
+	previewFrame.HealthContainer = healthContainer
+
+	local healthBar = CreateFrame("StatusBar", nil, healthContainer)
+	healthBar:SetAllPoints()
+	healthBar:SetMinMaxValues(0, 100)
+	healthBar:SetValue(100)
+	healthBar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+	healthBar:SetStatusBarColor(0, 0, 0, 0)
+	previewFrame.HealthBar = healthBar
+
+	local healthBarBackground = healthBar:CreateTexture(nil, "BACKGROUND")
+	healthBarBackground:SetPoint("TOPLEFT", healthBar, "TOPLEFT", -2, 3)
+	healthBarBackground:SetPoint("BOTTOMRIGHT", healthBar, "BOTTOMRIGHT", 6, -6)
+	if healthBarBackground.SetAtlas then
+		healthBarBackground:SetAtlas("UI-HUD-CoolDownManager-Bar-BG", true)
+	else
+		healthBarBackground:SetColorTexture(0.10, 0.10, 0.10, 0.82)
+	end
+	previewFrame.HealthBarBackground = healthBarBackground
+
+	local baseFill = healthBar:CreateTexture(nil, "ARTWORK", nil, 0)
+	if baseFill.SetAtlas then
+		baseFill:SetAtlas("UI-HUD-CoolDownManager-Bar", true)
+	else
+		baseFill:SetTexture("Interface\\Buttons\\WHITE8X8")
+	end
+	AnchorPreviewFillTexture(baseFill, healthBar)
+	SetTextureTint(baseFill, 0.22, 0.80, 0.22, 1.0)
+	previewFrame.HealthFill = baseFill
+
+	local selectedBorder = healthBar:CreateTexture(nil, "OVERLAY", nil, 4)
+	if selectedBorder.SetAtlas then
+		selectedBorder:SetAtlas("UI-HUD-Nameplates-Selected", true)
+	else
+		selectedBorder:SetColorTexture(0.95, 0.95, 0.95, PREVIEW_DEFAULT_BORDER_ALPHA)
+	end
+	selectedBorder:SetPoint("TOPLEFT", healthBarBackground, "TOPLEFT", -1, 1)
+	selectedBorder:SetPoint("BOTTOMRIGHT", healthBarBackground, "BOTTOMRIGHT", -3, 3)
+	previewFrame.BorderTexture = selectedBorder
+
+	local borderGlow = healthBar:CreateTexture(nil, "OVERLAY", nil, 3)
+	if borderGlow.SetAtlas then
+		borderGlow:SetAtlas("UI-HUD-Nameplates-Selected", true)
+	else
+		borderGlow:SetTexture("Interface\\Buttons\\WHITE8X8")
+	end
+	borderGlow:SetBlendMode("ADD")
+	borderGlow:SetPoint("TOPLEFT", healthBarBackground, "TOPLEFT", -3, 3)
+	borderGlow:SetPoint("BOTTOMRIGHT", healthBarBackground, "BOTTOMRIGHT", -1, 5)
+	borderGlow:Hide()
+	previewFrame.BorderGlow = borderGlow
+
+	local nameLabel = plateFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	nameLabel:SetJustifyH("LEFT")
+	nameLabel:SetText("Player")
+	previewFrame.NameLabel = nameLabel
+
+	local healthText = plateFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	healthText:SetJustifyH("RIGHT")
+	healthText:SetText("241 K")
+	previewFrame.HealthText = healthText
+
+	local styleLabel = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	styleLabel:SetPoint("BOTTOMLEFT", previewFrame, "BOTTOMLEFT", 12, 7)
+	styleLabel:SetJustifyH("LEFT")
+	styleLabel:SetText("")
+	previewFrame.StyleLabel = styleLabel
+
+	local borderLabel = previewFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	borderLabel:SetPoint("BOTTOMRIGHT", previewFrame, "BOTTOMRIGHT", -12, 7)
+	borderLabel:SetJustifyH("RIGHT")
+	borderLabel:SetText("")
+	previewFrame.BorderLabel = borderLabel
+
+	return previewFrame
+end
+
+local function RefreshNameplatePreview(previewFrame, unitKind, styleValue, borderEnabled, borderColor, addonEnabled)
+	if type(previewFrame) ~= "table" then
+		return
+	end
+
+	local layout = GetPreviewLayoutForStyle(styleValue)
+	local healthContainer = previewFrame.HealthContainer
+	local nameLabel = previewFrame.NameLabel
+	local healthText = previewFrame.HealthText
+	local borderTexture = previewFrame.BorderTexture
+	local borderGlow = previewFrame.BorderGlow
+	local styleLabel = previewFrame.StyleLabel
+	local borderLabel = previewFrame.BorderLabel
+
+	if
+		not IsFrameMutable(healthContainer)
+		or not IsFrameMutable(nameLabel)
+		or not IsFrameMutable(healthText)
+		or not IsFrameMutable(borderTexture)
+	then
+		return
+	end
+
+	local normalizedColor = borderColor
+	if type(normalizedColor) ~= "table" then
+		normalizedColor = { r = 1.0, g = 1.0, b = 1.0 }
+	end
+
+	healthContainer:ClearAllPoints()
+	healthContainer:SetPoint("TOPLEFT", previewFrame.PlateFrame, "TOPLEFT", 0, layout.nameInsideHealthBar and -18 or -26)
+	healthContainer:SetSize(PREVIEW_BAR_WIDTH, layout.healthBarHeight)
+
+	nameLabel:ClearAllPoints()
+	healthText:ClearAllPoints()
+
+	if layout.nameInsideHealthBar then
+		nameLabel:SetPoint("LEFT", healthContainer, "LEFT", 6, 0)
+		nameLabel:SetPoint("RIGHT", healthContainer, "RIGHT", -56, 0)
+		healthText:SetPoint("RIGHT", healthContainer, "RIGHT", -6, 0)
+	else
+		nameLabel:SetPoint("BOTTOMLEFT", healthContainer, "TOPLEFT", 6, 2)
+		nameLabel:SetPoint("BOTTOMRIGHT", healthContainer, "TOPRIGHT", -56, 2)
+		healthText:SetPoint("BOTTOMRIGHT", healthContainer, "TOPRIGHT", -6, 2)
+	end
+
+	local previewName = PREVIEW_NAME_BY_UNIT_KIND[unitKind] or "Player"
+	nameLabel:SetText(previewName)
+	if layout.nameColorBySelection and nameLabel.SetTextColor then
+		nameLabel:SetTextColor(1, 0.14, 0.14, 1)
+	elseif nameLabel.SetTextColor then
+		nameLabel:SetTextColor(1, 1, 1, 1)
+	end
+
+	healthText:SetText("241 K")
+
+	local borderAlpha = borderEnabled and PREVIEW_OVERRIDE_BORDER_ALPHA or PREVIEW_DEFAULT_BORDER_ALPHA
+	SetTextureTint(borderTexture, normalizedColor.r, normalizedColor.g, normalizedColor.b, borderAlpha)
+	if IsFrameMutable(borderGlow) then
+		if borderEnabled then
+			SetTextureTint(borderGlow, normalizedColor.r, normalizedColor.g, normalizedColor.b, PREVIEW_GLOW_ALPHA)
+			borderGlow:Show()
+		else
+			borderGlow:Hide()
+		end
+	end
+
+	if styleLabel then
+		styleLabel:SetText("Style: " .. PvPTogether:GetNameplateStyleLabel(styleValue))
+	end
+	if borderLabel then
+		borderLabel:SetText(borderEnabled and "Border: On" or "Border: Off")
+	end
+
+	previewFrame:SetAlpha(addonEnabled and 1 or 0.5)
+end
 
 local function GetStyleDropdownLabel(optionKey)
 	local configuredStyle = PvPTogether:GetOption(optionKey)
@@ -60,12 +328,12 @@ local function CreateDropdown(parent, titleText, tooltipText, x, y, width, initi
 end
 
 local function CreateStyleDropdown(parent, titleText, tooltipText, x, y, optionKey)
-		return CreateDropdown(parent, titleText, tooltipText, x, y, 220, function(_, level)
-			local inheritInfo = UIDropDownMenu_CreateInfo()
-			inheritInfo.text = INHERIT_STYLE_MENU_LABEL
-			inheritInfo.value = INHERIT_STYLE_DROPDOWN_VALUE
-			inheritInfo.checked = not PvPTogether:IsNameplateStyle(PvPTogether:GetOption(optionKey))
-			inheritInfo.func = function()
+	return CreateDropdown(parent, titleText, tooltipText, x, y, 220, function(_, level)
+		local inheritInfo = UIDropDownMenu_CreateInfo()
+		inheritInfo.text = INHERIT_STYLE_MENU_LABEL
+		inheritInfo.value = INHERIT_STYLE_DROPDOWN_VALUE
+		inheritInfo.checked = not PvPTogether:IsNameplateStyle(PvPTogether:GetOption(optionKey))
+		inheritInfo.func = function()
 			PvPTogether:SetOption(optionKey, nil)
 			PvPTogether:RefreshOptionsWindow()
 			CloseDropDownMenus()
@@ -262,9 +530,15 @@ function PvPTogether:RefreshOptionsWindow()
 	local partyStyleLabel, partySelectedValue = GetStyleDropdownLabel("partyMemberStyle")
 	local friendlyStyleLabel, friendlySelectedValue = GetStyleDropdownLabel("friendlyPlayerStyle")
 	local enemyStyleLabel, enemySelectedValue = GetStyleDropdownLabel("enemyPlayerStyle")
+	local partyStyleValue = self:GetConfiguredStyleForUnitKind("partyMember")
+	local friendlyStyleValue = self:GetConfiguredStyleForUnitKind("friendlyPlayer")
+	local enemyStyleValue = self:GetConfiguredStyleForUnitKind("enemyPlayer")
 	local partyBorderEnabled = self:GetOption("partyMemberBorderEnabled") == true
 	local friendlyBorderEnabled = self:GetOption("friendlyPlayerBorderEnabled") == true
 	local enemyBorderEnabled = self:GetOption("enemyPlayerBorderEnabled") == true
+	local partyBorderColor = self:GetConfiguredBorderColorForUnitKind("partyMember")
+	local friendlyBorderColor = self:GetConfiguredBorderColorForUnitKind("friendlyPlayer")
+	local enemyBorderColor = self:GetConfiguredBorderColorForUnitKind("enemyPlayer")
 
 	RefreshDropdownControl(controls.partyMemberStyle, partyStyleLabel, partySelectedValue)
 	RefreshDropdownControl(controls.friendlyPlayerStyle, friendlyStyleLabel, friendlySelectedValue)
@@ -337,6 +611,31 @@ function PvPTogether:RefreshOptionsWindow()
 	SetColorSwatchEnabled(controls.partyMemberBorderColor, enabled and partyBorderEnabled)
 	SetColorSwatchEnabled(controls.friendlyPlayerBorderColor, enabled and friendlyBorderEnabled)
 	SetColorSwatchEnabled(controls.enemyPlayerBorderColor, enabled and enemyBorderEnabled)
+
+	RefreshNameplatePreview(
+		controls.partyMemberPreview,
+		"partyMember",
+		partyStyleValue,
+		partyBorderEnabled,
+		partyBorderColor,
+		enabled
+	)
+	RefreshNameplatePreview(
+		controls.friendlyPlayerPreview,
+		"friendlyPlayer",
+		friendlyStyleValue,
+		friendlyBorderEnabled,
+		friendlyBorderColor,
+		enabled
+	)
+	RefreshNameplatePreview(
+		controls.enemyPlayerPreview,
+		"enemyPlayer",
+		enemyStyleValue,
+		enemyBorderEnabled,
+		enemyBorderColor,
+		enabled
+	)
 end
 
 function PvPTogether:OpenOptionsWindow()
@@ -420,6 +719,7 @@ function PvPTogether:InitializeOptionsWindow()
 		})
 		PvPTogether:RefreshOptionsWindow()
 	end)
+	local partyMemberPreview = CreateNameplatePreview(frame, PREVIEW_LEFT, -118)
 
 	local friendlyPlayerStyle = CreateStyleDropdown(
 		frame,
@@ -461,6 +761,7 @@ function PvPTogether:InitializeOptionsWindow()
 		})
 		PvPTogether:RefreshOptionsWindow()
 	end)
+	local friendlyPlayerPreview = CreateNameplatePreview(frame, PREVIEW_LEFT, -242)
 
 	local enemyPlayerStyle = CreateStyleDropdown(
 		frame,
@@ -502,6 +803,7 @@ function PvPTogether:InitializeOptionsWindow()
 		})
 		PvPTogether:RefreshOptionsWindow()
 	end)
+	local enemyPlayerPreview = CreateNameplatePreview(frame, PREVIEW_LEFT, -366)
 
 	if not partyMemberStyle or not friendlyPlayerStyle or not enemyPlayerStyle then
 		local missingDropdownWarning = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -524,6 +826,9 @@ function PvPTogether:InitializeOptionsWindow()
 		enemyPlayerBorderEnabled = enemyPlayerBorderEnabled,
 		enemyPlayerBorderColor = enemyPlayerBorderColor,
 		resetEnemyPlayerBorderColor = resetEnemyPlayerBorderColor,
+		partyMemberPreview = partyMemberPreview,
+		friendlyPlayerPreview = friendlyPlayerPreview,
+		enemyPlayerPreview = enemyPlayerPreview,
 	}
 
 	frame:SetScript("OnShow", function()
