@@ -896,7 +896,7 @@ function PvPTogether:InitializeOptionsWindow()
 	local partyMemberStyle = CreateStyleDropdown(
 		frame,
 		"Party Members",
-		"Style used for party or raid member nameplates.",
+		"Style used for actual party member nameplates only.",
 		16,
 		-120,
 		"partyMemberStyle"
@@ -905,7 +905,7 @@ function PvPTogether:InitializeOptionsWindow()
 		frame,
 		"partyMemberBorderEnabled",
 		"Border Color",
-		"Enable a custom border tint for party or raid member nameplates.",
+		"Enable a custom border tint for actual party member nameplates only.",
 		36,
 		-188
 	)
@@ -913,7 +913,7 @@ function PvPTogether:InitializeOptionsWindow()
 		frame,
 		"partyMemberBorderColor",
 		"Color",
-		"Border tint color for party or raid member nameplates.",
+		"Border tint color for actual party member nameplates only.",
 		self.DEFAULTS.partyMemberBorderColor,
 		320,
 		-188
@@ -938,7 +938,7 @@ function PvPTogether:InitializeOptionsWindow()
 	local friendlyPlayerStyle = CreateStyleDropdown(
 		frame,
 		"Friendly Players",
-		"Style used for friendly player nameplates that are not in your party or raid.",
+		"Style used for friendly player nameplates that are not in your actual party.",
 		16,
 		-244,
 		"friendlyPlayerStyle"

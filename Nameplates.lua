@@ -21,6 +21,7 @@ local STYLE_BLOCK = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.Block o
 local STYLE_HEALTH_FOCUS = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.HealthFocus or 3
 local STYLE_CAST_FOCUS = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.CastFocus or 4
 local STYLE_LEGACY = Enum and Enum.NamePlateStyle and Enum.NamePlateStyle.Legacy or 5
+local PARTY_CATEGORY_HOME = LE_PARTY_CATEGORY_HOME or 1
 
 local FALLBACK_NAME_PLATE_SCALES = {
 	[SIZE_SMALL] = { horizontal = 0.75, vertical = 0.8, classification = 0.8, aura = 0.75 },
@@ -222,24 +223,9 @@ local function CopyFrameOptions(baseFrameOptions, namePlateStyle)
 	return copiedOptions
 end
 
-local function IsPlayerInGroup(unitToken)
+local function IsPlayerInHomeParty(unitToken)
 	if not IsNonSecretNonEmptyString(unitToken) then
 		return false
-	end
-
-	local okFriend, isFriend = pcall(UnitIsFriend, "player", unitToken)
-	if okFriend and not isFriend then
-		return false
-	end
-
-	local okParty, inParty = pcall(UnitInParty, unitToken)
-	if okParty and inParty then
-		return true
-	end
-
-	local okRaid, inRaid = pcall(UnitInRaid, unitToken)
-	if okRaid and inRaid then
-		return true
 	end
 
 	local function SafeUnitIsUnit(leftUnit, rightUnit)
@@ -254,20 +240,17 @@ local function IsPlayerInGroup(unitToken)
 		return false
 	end
 
-	local okRaidState, inRaidGroup = pcall(IsInRaid)
-	local isInRaidGroup = okRaidState and inRaidGroup and true or false
-	if isInRaidGroup then
-		local okMembers, memberCount = pcall(GetNumGroupMembers)
-		local raidCount = okMembers and tonumber(memberCount) or 0
-		for index = 1, raidCount do
-			local raidUnitToken = "raid" .. tostring(index)
-			if SafeUnitIsUnit(unitToken, raidUnitToken) then
-				return not SafeUnitIsUnit(raidUnitToken, "player")
-			end
-		end
+	local okFriend, isFriend = pcall(UnitIsFriend, "player", unitToken)
+	if okFriend and not isFriend then
+		return false
 	end
 
-	local okPartyMembers, partyCount = pcall(GetNumSubgroupMembers)
+	local okParty, inParty = pcall(UnitInParty, unitToken, PARTY_CATEGORY_HOME)
+	if okParty and inParty then
+		return true
+	end
+
+	local okPartyMembers, partyCount = pcall(GetNumSubgroupMembers, PARTY_CATEGORY_HOME)
 	local subgroupCount = okPartyMembers and tonumber(partyCount) or 0
 	for index = 1, subgroupCount do
 		local partyUnitToken = "party" .. tostring(index)
@@ -299,7 +282,7 @@ local function ResolveUnitKind(namePlateFrameBase)
 		return "enemyPlayer"
 	end
 
-	if IsPlayerInGroup(unitToken) then
+	if IsPlayerInHomeParty(unitToken) then
 		return "partyMember"
 	end
 
@@ -328,7 +311,7 @@ local function ResolveUnitKindFromUnitFrame(unitFrame)
 				return "enemyPlayer"
 			end
 
-			if IsPlayerInGroup(unitToken) then
+			if IsPlayerInHomeParty(unitToken) then
 				return "partyMember"
 			end
 

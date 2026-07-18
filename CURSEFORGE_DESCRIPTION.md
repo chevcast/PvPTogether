@@ -7,7 +7,7 @@ It lets you keep Blizzard's native nameplate system, but apply style and border 
 ## What It Does
 
 - Adds per-unit-type Blizzard nameplate style overrides for:
-- Party Members
+- Party Members (actual party only)
 - Friendly Players (non-group)
 - Enemy Players
 - Adds an `Inherit (Global)` option to each style dropdown so you can disable a specific override and fall back to Blizzard's global nameplate style.
@@ -25,7 +25,7 @@ It lets you keep Blizzard's native nameplate system, but apply style and border 
 ## Why Use It
 
 - Keep Blizzard nameplates while still getting clearer PvP-oriented visual separation.
-- Make group, friendly, and enemy player plates easier to distinguish at a glance.
+- Make party, non-party friendly, and enemy player plates easier to distinguish at a glance.
 - Tune visuals per category without replacing your whole nameplate system.
 
 ## Options
